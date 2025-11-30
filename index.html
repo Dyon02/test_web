@@ -2,77 +2,640 @@
 <html lang="id">
 <head>
   <meta charset="UTF-8" />
-  <title>Deteksi Suara – Teachable Machine</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Audio Classifier – Teachable Machine</title>
+
+  <!-- TensorFlow.js dan model Speech Commands -->
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@3.21.0/dist/tf.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/speech-commands@0.4.0/dist/speech-commands.min.js"></script>
+
   <style>
-    body { font-family: Arial, sans-serif; padding: 20px; }
-    #label-container div { margin: 4px 0; }
+    * {
+      box-sizing: border-box;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
+        sans-serif;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background: radial-gradient(circle at top, #111827, #020617 55%);
+      color: #e5e7eb;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      padding: 24px;
+    }
+
+    .app {
+      width: 100%;
+      max-width: 960px;
+      background: rgba(15, 23, 42, 0.95);
+      border-radius: 18px;
+      padding: 24px 24px 28px;
+      box-shadow: 0 25px 50px rgba(0, 0, 0, 0.45);
+      border: 1px solid rgba(148, 163, 184, 0.25);
+      backdrop-filter: blur(16px);
+    }
+
+    .app-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 16px;
+      margin-bottom: 20px;
+    }
+
+    .title-group h1 {
+      margin: 0;
+      font-size: 1.5rem;
+      letter-spacing: 0.02em;
+    }
+
+    .title-group p {
+      margin: 4px 0 0;
+      font-size: 0.9rem;
+      color: #9ca3af;
+    }
+
+    .badge {
+      padding: 4px 10px;
+      border-radius: 999px;
+      border: 1px solid rgba(52, 211, 153, 0.4);
+      color: #6ee7b7;
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      font-weight: 600;
+      background: rgba(22, 163, 74, 0.12);
+    }
+
+    .layout {
+      display: grid;
+      grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr);
+      gap: 20px;
+    }
+
+    @media (max-width: 800px) {
+      .layout {
+        grid-template-columns: minmax(0, 1fr);
+      }
+    }
+
+    .card {
+      background: radial-gradient(circle at top left, #1f2937, #020617);
+      border-radius: 16px;
+      padding: 18px 18px 20px;
+      border: 1px solid rgba(55, 65, 81, 0.75);
+    }
+
+    .card-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 12px;
+    }
+
+    .card-header h2 {
+      margin: 0;
+      font-size: 1.05rem;
+    }
+
+    .card-header span {
+      font-size: 0.78rem;
+      color: #9ca3af;
+    }
+
+    .primary-label {
+      font-size: 2.1rem;
+      font-weight: 700;
+      margin: 4px 0 4px;
+    }
+
+    .confidence {
+      color: #9ca3af;
+      font-size: 0.9rem;
+    }
+
+    .status-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 999px;
+      margin-right: 6px;
+      background: #6b7280;
+      display: inline-block;
+    }
+
+    .status-dot.live {
+      background: #22c55e;
+      box-shadow: 0 0 10px rgba(34, 197, 94, 0.6);
+    }
+
+    .status-text {
+      font-size: 0.82rem;
+      color: #9ca3af;
+    }
+
+    .button-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin: 10px 0 8px;
+    }
+
+    button {
+      border: none;
+      cursor: pointer;
+      border-radius: 999px;
+      padding: 8px 14px;
+      font-size: 0.9rem;
+      font-weight: 500;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      transition: transform 0.08s ease, box-shadow 0.1s ease,
+        background 0.15s ease, opacity 0.15s ease;
+    }
+
+    button:active {
+      transform: scale(0.96);
+    }
+
+    .btn-primary {
+      background: linear-gradient(135deg, #22c55e, #10b981);
+      color: #052e16;
+      box-shadow: 0 10px 25px rgba(16, 185, 129, 0.45);
+    }
+
+    .btn-primary.off {
+      opacity: 0.65;
+      box-shadow: none;
+      background: linear-gradient(135deg, #4b5563, #374151);
+      color: #e5e7eb;
+    }
+
+    .btn-outline {
+      background: transparent;
+      color: #e5e7eb;
+      border: 1px solid rgba(148, 163, 184, 0.7);
+    }
+
+    .btn-outline:hover {
+      background: rgba(148, 163, 184, 0.12);
+    }
+
+    .btn-sm {
+      padding: 6px 10px;
+      font-size: 0.8rem;
+    }
+
+    .hint {
+      font-size: 0.78rem;
+      color: #9ca3af;
+      margin-top: 4px;
+    }
+
+    .probabilities {
+      margin-top: 6px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      max-height: 260px;
+      overflow: auto;
+      padding-right: 4px;
+    }
+
+    .prob-row {
+      display: grid;
+      grid-template-columns: 100px 1fr 48px;
+      align-items: center;
+      gap: 8px;
+      font-size: 0.82rem;
+    }
+
+    .prob-label {
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      color: #e5e7eb;
+    }
+
+    .prob-bar-wrapper {
+      position: relative;
+      height: 8px;
+      border-radius: 999px;
+      background: rgba(31, 41, 55, 0.9);
+      overflow: hidden;
+    }
+
+    .prob-bar {
+      position: absolute;
+      top: 0;
+      left: 0;
+      bottom: 0;
+      width: 0;
+      border-radius: 999px;
+      background: linear-gradient(90deg, #22c55e, #0ea5e9);
+      transition: width 0.12s ease-out;
+    }
+
+    .prob-value {
+      text-align: right;
+      color: #9ca3af;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .file-section {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .file-drop {
+      border-radius: 14px;
+      border: 1px dashed rgba(148, 163, 184, 0.7);
+      padding: 16px;
+      text-align: center;
+      background: rgba(15, 23, 42, 0.6);
+      cursor: pointer;
+      transition: border-color 0.15s ease, background 0.15s ease;
+    }
+
+    .file-drop:hover {
+      border-color: #38bdf8;
+      background: rgba(15, 23, 42, 0.9);
+    }
+
+    .file-drop strong {
+      display: block;
+      margin-bottom: 4px;
+      font-size: 0.95rem;
+    }
+
+    .file-drop span {
+      font-size: 0.8rem;
+      color: #9ca3af;
+    }
+
+    input[type="file"] {
+      display: none;
+    }
+
+    audio {
+      width: 100%;
+      margin-top: 4px;
+    }
+
+    .file-info {
+      font-size: 0.8rem;
+      color: #d1d5db;
+    }
+
+    .warning {
+      font-size: 0.78rem;
+      color: #fbbf24;
+    }
+
+    .footer {
+      margin-top: 18px;
+      border-top: 1px solid rgba(31, 41, 55, 0.9);
+      padding-top: 10px;
+      font-size: 0.78rem;
+      color: #6b7280;
+      display: flex;
+      justify-content: space-between;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .footer a {
+      color: #38bdf8;
+      text-decoration: none;
+    }
+
+    .footer a:hover {
+      text-decoration: underline;
+    }
   </style>
 </head>
 <body>
-  <h1>Deteksi Suara – Teachable Machine</h1>
+  <main class="app">
+    <header class="app-header">
+      <div class="title-group">
+        <h1>Audio Classifier Demo</h1>
+        <p>
+          Model audio dari <strong>Teachable Machine</strong> dengan antarmuka
+          web responsif.
+        </p>
+      </div>
+      <div class="badge">Audio Model</div>
+    </header>
 
-  <button type="button" onclick="init()">Mulai / Izinkan Mikrofon</button>
-  <div id="label-container"></div>
+    <section class="layout">
+      <!-- KIRI: Hasil Prediksi & Kontrol Mikrofon -->
+      <section class="card">
+        <div class="card-header">
+          <div>
+            <h2>Prediksi Saat Ini</h2>
+            <span id="model-name">Model belum dimuat</span>
+          </div>
+          <div class="status-text">
+            <span id="status-dot" class="status-dot"></span>
+            <span id="status-text">Idle</span>
+          </div>
+        </div>
 
-  <div>Teachable Machine Audio Model</div>
-<button type="button" onclick="init()">Start</button>
-<div id="label-container"></div>
-<script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@1.3.1/dist/tf.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/speech-commands@0.4.0/dist/speech-commands.min.js"></script>
+        <div>
+          <div class="primary-label" id="top-label">–</div>
+          <div class="confidence" id="top-confidence">Skor tertinggi: –</div>
+        </div>
 
-<script type="text/javascript">
-    // more documentation available at
-    // https://github.com/tensorflow/tfjs-models/tree/master/speech-commands
+        <div class="button-row">
+          <button id="btn-mic" class="btn-primary off">
+            🎤 <span id="btn-mic-text">Mulai dari Mikrofon</span>
+          </button>
+          <button id="btn-stop" class="btn-outline btn-sm">
+            ⏹ Stop
+          </button>
+        </div>
+        <p class="hint">
+          Klik <strong>Mulai dari Mikrofon</strong> lalu ucapkan/putar suara
+          yang sudah kamu latih. Browser akan meminta izin mikrofon.
+        </p>
 
-    // the link to your model provided by Teachable Machine export panel
-    const URL = "https://teachablemachine.withgoogle.com/models/bqKhgGNt-/";
+        <div class="probabilities" id="probabilities"></div>
+      </section>
+
+      <!-- KANAN: Upload File & Audio Player -->
+      <section class="card">
+        <div class="card-header">
+          <div>
+            <h2>Test dengan File Audio</h2>
+            <span>Upload & putar suara dari file</span>
+          </div>
+        </div>
+
+        <div class="file-section">
+          <label class="file-drop" for="file-input">
+            <strong>+ Tambah File Audio</strong>
+            <span>Pilih file .wav / .mp3 / .m4a / dll dari perangkatmu</span>
+          </label>
+          <input
+            type="file"
+            id="file-input"
+            accept="audio/*"
+          />
+
+          <div id="file-info" class="file-info">Belum ada file yang dipilih.</div>
+
+          <audio id="audio-player" controls></audio>
+
+          <p class="warning" id="file-warning">
+            Saat ini file audio <em>hanya diputar</em>. Untuk mengklasifikasikan
+            langsung dari file, diperlukan langkah preprocessing tambahan
+            (mengubah audio menjadi spectrogram dan memanggil
+            <code>recognizer.recognize()</code>).
+          </p>
+        </div>
+      </section>
+    </section>
+
+    <footer class="footer">
+      <span>Teachable Machine + TensorFlow.js – Demo audio classification.</span>
+      <span>
+        Ganti URL model di kode:
+        <code>const MODEL_URL = "…" </code>
+      </span>
+    </footer>
+  </main>
+
+  <script>
+    // ==============================
+    // 1. KONFIGURASI MODEL
+    // ==============================
+
+    // TODO: Ganti dengan URL model Teachable Machine-mu
+    // Contoh: "https://teachablemachine.withgoogle.com/models/abcd1234/"
+    const MODEL_URL = "https://teachablemachine.withgoogle.com/models/bqKhgGNt-/";
+
+    let recognizer;
+    let labels = [];
+    let isListening = false;
+
+    const statusDot = document.getElementById("status-dot");
+    const statusText = document.getElementById("status-text");
+    const topLabelEl = document.getElementById("top-label");
+    const topConfEl = document.getElementById("top-confidence");
+    const probContainer = document.getElementById("probabilities");
+    const modelNameEl = document.getElementById("model-name");
+    const btnMic = document.getElementById("btn-mic");
+    const btnMicText = document.getElementById("btn-mic-text");
+    const btnStop = document.getElementById("btn-stop");
+
+    // ==============================
+    // 2. LOAD MODEL
+    // ==============================
 
     async function createModel() {
-        const checkpointURL = URL + "model.json"; // model topology
-        const metadataURL = URL + "metadata.json"; // model metadata
+      const checkpointURL = MODEL_URL + "model.json";
+      const metadataURL = MODEL_URL + "metadata.json";
 
-        const recognizer = speechCommands.create(
-            "BROWSER_FFT", // fourier transform type, not useful to change
-            undefined, // speech commands vocabulary feature, not useful for your models
-            checkpointURL,
-            metadataURL);
+      const rec = speechCommands.create(
+        "BROWSER_FFT",
+        undefined,
+        checkpointURL,
+        metadataURL
+      );
 
-        // check that model and metadata are loaded via HTTPS requests.
-        await recognizer.ensureModelLoaded();
-
-        return recognizer;
+      await rec.ensureModelLoaded();
+      return rec;
     }
 
-    async function init() {
-        const recognizer = await createModel();
-        const classLabels = recognizer.wordLabels(); // get class labels
-        const labelContainer = document.getElementById("label-container");
-        for (let i = 0; i < classLabels.length; i++) {
-            labelContainer.appendChild(document.createElement("div"));
+    async function ensureModelLoaded() {
+      if (recognizer) return;
+
+      setStatus("Memuat model…", false);
+
+      try {
+        recognizer = await createModel();
+        labels = recognizer.wordLabels(); // label kelas
+        modelNameEl.textContent = `Kelas: ${labels.join(", ")}`;
+        buildProbabilityRows(labels);
+        setStatus("Model siap. Klik Mulai dari Mikrofon.", false);
+      } catch (err) {
+        console.error(err);
+        setStatus("Gagal memuat model. Cek URL MODEL_URL.", false);
+        alert("Gagal memuat model. Pastikan URL MODEL_URL sudah benar.");
+      }
+    }
+
+    function buildProbabilityRows(labels) {
+      probContainer.innerHTML = "";
+      labels.forEach((label) => {
+        const row = document.createElement("div");
+        row.className = "prob-row";
+
+        const nameEl = document.createElement("div");
+        nameEl.className = "prob-label";
+        nameEl.textContent = label;
+
+        const barWrap = document.createElement("div");
+        barWrap.className = "prob-bar-wrapper";
+
+        const bar = document.createElement("div");
+        bar.className = "prob-bar";
+        bar.dataset.label = label;
+        barWrap.appendChild(bar);
+
+        const valueEl = document.createElement("div");
+        valueEl.className = "prob-value";
+        valueEl.textContent = "0.00";
+
+        row.appendChild(nameEl);
+        row.appendChild(barWrap);
+        row.appendChild(valueEl);
+
+        probContainer.appendChild(row);
+      });
+    }
+
+    // ==============================
+    // 3. LISTEN DARI MIKROFON
+    // ==============================
+
+    async function startListening() {
+      await ensureModelLoaded();
+      if (!recognizer) return;
+
+      if (isListening) return;
+
+      isListening = true;
+      setStatus("Mendengarkan…", true);
+      btnMic.classList.remove("off");
+      btnMicText.textContent = "Sedang Mendengarkan…";
+
+      recognizer.listen(
+        (result) => {
+          const scores = Array.from(result.scores);
+          updateUIWithScores(scores);
+        },
+        {
+          includeSpectrogram: false,
+          probabilityThreshold: 0.0,
+          invokeCallbackOnNoiseAndUnknown: true,
+          overlapFactor: 0.5, // 0–1, semakin besar semakin sering callback
+        }
+      );
+    }
+
+    function stopListening() {
+      if (!recognizer || !isListening) return;
+
+      recognizer.stopListening();
+      isListening = false;
+      setStatus("Idle", false);
+      btnMic.classList.add("off");
+      btnMicText.textContent = "Mulai dari Mikrofon";
+    }
+
+    function updateUIWithScores(scores) {
+      if (!labels.length) return;
+
+      const pairs = scores.map((s, i) => ({
+        label: labels[i],
+        score: s,
+      }));
+
+      pairs.sort((a, b) => b.score - a.score);
+      const best = pairs[0];
+
+      topLabelEl.textContent = best.label;
+      topConfEl.textContent = `Skor tertinggi: ${(best.score * 100).toFixed(
+        1
+      )}%`;
+
+      // Update bar untuk tiap label
+      pairs.forEach((p) => {
+        const bar = probContainer.querySelector(
+          `.prob-bar[data-label="${CSS.escape(p.label)}"]`
+        );
+        if (bar) {
+          bar.style.width = `${(p.score * 100).toFixed(1)}%`;
         }
 
-        // listen() takes two arguments:
-        // 1. A callback function that is invoked anytime a word is recognized.
-        // 2. A configuration object with adjustable fields
-        recognizer.listen(result => {
-            const scores = result.scores; // probability of prediction for each class
-            // render the probability scores per class
-            for (let i = 0; i < classLabels.length; i++) {
-                const classPrediction = classLabels[i] + ": " + result.scores[i].toFixed(2);
-                labelContainer.childNodes[i].innerHTML = classPrediction;
-            }
-        }, {
-            includeSpectrogram: true, // in case listen should return result.spectrogram
-            probabilityThreshold: 0.75,
-            invokeCallbackOnNoiseAndUnknown: true,
-            overlapFactor: 0.50 // probably want between 0.5 and 0.75. More info in README
-        });
-
-        // Stop the recognition in 5 seconds.
-        // setTimeout(() => recognizer.stopListening(), 5000);
+        // update angka di kolom kanan
+        const row = bar?.closest(".prob-row");
+        if (row) {
+          const valueEl = row.querySelector(".prob-value");
+          valueEl.textContent = (p.score * 100).toFixed(1) + "%";
+        }
+      });
     }
-</script>
 
+    function setStatus(text, live) {
+      statusText.textContent = text;
+      if (live) {
+        statusDot.classList.add("live");
+      } else {
+        statusDot.classList.remove("live");
+      }
+    }
 
+    // ==============================
+    // 4. HANDLER UPLOAD FILE AUDIO
+    // (Saat ini: hanya memutar file + info)
+    // ==============================
+
+    const fileInput = document.getElementById("file-input");
+    const audioPlayer = document.getElementById("audio-player");
+    const fileInfo = document.getElementById("file-info");
+
+    fileInput.addEventListener("change", handleFileChange);
+
+    function handleFileChange(event) {
+      const file = event.target.files?.[0];
+      if (!file) return;
+
+      const url = URL.createObjectURL(file);
+      audioPlayer.src = url;
+      audioPlayer.play().catch(() => {
+        // ignore autoplay error; user bisa klik play manual
+      });
+
+      fileInfo.textContent = `File: ${file.name} (${Math.round(
+        file.size / 1024
+      )} KB)`;
+
+      // === INFO PENTING ===
+      // Untuk mengklasifikasikan langsung dari file, langkah lanjutannya:
+      // 1. Decode audio dengan Web Audio API -> Float32Array waveform
+      // 2. Ubah waveform jadi spectrogram dengan parameter yang sama
+      //    seperti yang dipakai "BROWSER_FFT".
+      // 3. Panggil recognizer.recognize(spectrogramTensor)
+      //    (lihat dokumentasi tfjs speech-commands: bagian offline recognition).
+      //
+      // Proses ini cukup panjang & butuh pemahaman sinyal audio,
+      // jadi di demo ini kita batasi dulu ke real-time dari mikrofon.
+    }
+
+    // ==============================
+    // 5. EVENT LISTENER TOMBOL
+    // ==============================
+
+    btnMic.addEventListener("click", () => {
+      if (isListening) {
+        stopListening();
+      } else {
+        startListening();
+      }
+    });
+
+    btnStop.addEventListener("click", () => {
+      stopListening();
+    });
+
+    // Opsi: langsung coba load model saat halaman dibuka
+    ensureModelLoaded();
+  </script>
 </body>
 </html>
